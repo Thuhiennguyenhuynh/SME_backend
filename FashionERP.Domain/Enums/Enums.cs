@@ -107,7 +107,8 @@
         Pending,
         Completed,
         Cancelled,
-        Returned
+        Returned,
+        PartiallyReturned
     }
 
     public enum ReturnType
