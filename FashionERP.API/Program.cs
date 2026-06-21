@@ -324,7 +324,7 @@ builder.Services.AddCors(opt =>
             .AllowAnyMethod()
             .AllowCredentials();
     });
-
+});
 
 
     // 10.Đăng ký HttpClient có tên "AiService" để gọi sang Python FastAPI
@@ -341,7 +341,7 @@ builder.Services.AddHttpClient("AiService", client =>
 
     // 12. Đăng ký tầng nghiệp vụ AI (build context từ DB + gọi client + ghi log)
     builder.Services.AddScoped<IAIService, AIService>();
-});
+
 
 
 

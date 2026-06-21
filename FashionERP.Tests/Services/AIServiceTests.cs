@@ -195,8 +195,8 @@
         [Fact(DisplayName = "Forecast: đủ dữ liệu lịch sử → gọi AI client và trả kết quả dự báo")]
         public async Task ForecastAsync_EnoughHistory_CallsAIClient()
         {
-            // Seed 20 ngày giao dịch EXPORT để đủ điều kiện (>= 14)
-            for (int i = 0; i < 20; i++)
+            // Seed 30 ngày giao dịch EXPORT để đủ điều kiện (>= 30)
+            for (int i = 0; i < 30; i++)
             {
                 _db.InventoryTransactions.Add(new InventoryTransaction
                 {
@@ -212,13 +212,18 @@
             await _db.SaveChangesAsync();
 
             _aiClientMock
-                .Setup(c => c.ForecastAsync(It.IsAny<AIForecastProxyRequest>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new InventoryForecastResponseDto
-                {
-                    VariantId = _variantId,
-                    WillRunOutInDays = 10,
-                    NeedReorder = true
-                });
+    .Setup(c => c.ForecastAsync(It.IsAny<AIForecastProxyRequest>(), It.IsAny<CancellationToken>()))
+    .ReturnsAsync(new InventoryForecastResponseDto
+    {
+        VariantId = _variantId,
+        Forecast = Enumerable.Range(1, 30)
+            .Select(i => new InventoryForecastPointDto
+            {
+                Date = DateTime.UtcNow.Date.AddDays(i),
+                PredictedQuantitySold = 4 // 20 tồn kho / 4 mỗi ngày = cạn sau 5 ngày
+            })
+            .ToList()
+    });
 
             var result = await _service.ForecastAsync(new InventoryForecastRequestDto
             {
@@ -226,8 +231,8 @@
                 HorizonDays = 30
             }, _userId);
 
-            result.WillRunOutInDays.Should().Be(10);
-            result.NeedReorder.Should().BeTrue();
+            result.WillRunOutInDays.Should().Be(5);
+            result.NeedReorder.Should().BeTrue(); // vì 5 <= 14 ngày
             result.CurrentStock.Should().Be(20);
 
             _aiClientMock.Verify(

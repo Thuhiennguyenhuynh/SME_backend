@@ -246,16 +246,15 @@ namespace FashionERP.Infrastructure.Services
                     .OrderBy(p => p.Date)
                     .ToListAsync();
 
-                if (history.Count < 14)
+                if (history.Count < 30)
                 {
-                    // Không đủ dữ liệu để dự báo có ý nghĩa - trả về sớm, không gọi AI service
                     result = new InventoryForecastResponseDto
                     {
                         VariantId = request.VariantId,
                         CurrentStock = inventory.Quantity,
                         WillRunOutInDays = null,
                         NeedReorder = inventory.Quantity <= inventory.MinStock,
-                        Note = "Chưa đủ dữ liệu lịch sử bán hàng (cần tối thiểu 14 ngày có giao dịch xuất kho) để dự báo chính xác"
+                        Note = "Chưa đủ dữ liệu lịch sử bán hàng (cần tối thiểu 30 ngày có giao dịch xuất kho) để dự báo chính xác"
                     };
                     return result;
                 }
@@ -268,8 +267,27 @@ namespace FashionERP.Infrastructure.Services
                 };
 
                 result = await _aiClient.ForecastAsync(proxyRequest);
+
+                // Python chỉ dự báo NHU CẦU (demand), không biết tồn kho hiện tại
+                // -> C# tự mô phỏng cạn kho dựa trên forecast curve + tồn kho thật
+                var sortedForecast = result.Forecast.OrderBy(p => p.Date).ToList();
+                double remainingStock = inventory.Quantity;
+                int? willRunOutInDays = null;
+                for (int i = 0; i < sortedForecast.Count; i++)
+                {
+                    remainingStock -= sortedForecast[i].PredictedQuantitySold;
+                    if (remainingStock <= 0)
+                    {
+                        willRunOutInDays = i + 1;
+                        break;
+                    }
+                }
+
                 result.CurrentStock = inventory.Quantity;
-                result.NeedReorder = result.NeedReorder || inventory.Quantity <= inventory.MinStock;
+                result.WillRunOutInDays = willRunOutInDays;
+                // Cần nhập nếu: dự báo cạn trong vòng 14 ngày tới, HOẶC tồn kho đã chạm ngưỡng tối thiểu
+                result.NeedReorder = (willRunOutInDays.HasValue && willRunOutInDays <= 14)
+                                      || inventory.Quantity <= inventory.MinStock;
             }
             catch (Exception ex)
             {
