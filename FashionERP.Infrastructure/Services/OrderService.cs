@@ -238,8 +238,11 @@ namespace FashionERP.Infrastructure.Services
             if (order.Status == OrderStatus.Cancelled)
                 throw new BusinessException("Đơn hàng này đã được hủy trước đó");
 
-            if (order.Status == OrderStatus.Returned)
-                throw new BusinessException("Không thể hủy đơn hàng đã đổi trả");
+            // CHANGED: trước đây chỉ chặn khi Status == Returned.
+            // Giờ Returned/PartiallyReturned đều có nghĩa là đơn đã có hàng được trả lại,
+            // không cho hủy nữa trong cả 2 trường hợp.
+            if (order.Status == OrderStatus.Returned || order.Status == OrderStatus.PartiallyReturned)
+                throw new BusinessException("Không thể hủy đơn hàng đã đổi trả (toàn bộ hoặc một phần)");
 
             await using var tx = await _db.Database.BeginTransactionAsync();
             try
@@ -323,6 +326,10 @@ namespace FashionERP.Infrastructure.Services
         }
 
         // ─── CREATE RETURN ────────────────────────────────────
+        // CHANGED: trước đây luôn set order.Status = Returned dù chỉ trả 1 variant trong đơn nhiều món.
+        // Giờ tính tổng đã trả trên TẤT CẢ variant của đơn so với tổng đã mua:
+        //   - Trả hết toàn bộ các dòng hàng  → Status = Returned
+        //   - Trả một phần (còn dòng/số lượng chưa trả) → Status = PartiallyReturned
         public async Task<OrderResponseDto> CreateReturnAsync(
             CreateReturnRequestDto request, Guid createdBy)
         {
@@ -331,8 +338,10 @@ namespace FashionERP.Infrastructure.Services
                 .FirstOrDefaultAsync(o => o.Id == request.OrderId)
                 ?? throw new NotFoundException("Đơn hàng", request.OrderId);
 
-            if (order.Status != OrderStatus.Completed)
-                throw new BusinessException("Chỉ có thể đổi trả đơn hàng đã hoàn thành");
+            // CHANGED: cho phép tạo thêm phiếu trả khi đơn đang Completed HOẶC đã PartiallyReturned
+            // (trước đây chỉ chấp nhận Completed, nên không trả tiếp được lần 2 sau khi có Status khác Completed)
+            if (order.Status != OrderStatus.Completed && order.Status != OrderStatus.PartiallyReturned)
+                throw new BusinessException("Chỉ có thể đổi trả đơn hàng đã hoàn thành (hoặc đang trả một phần)");
 
             // Kiểm tra số lượng trả không vượt quá số lượng mua
             var orderItem = order.Items.FirstOrDefault(i => i.VariantId == request.VariantId)
@@ -389,7 +398,21 @@ namespace FashionERP.Infrastructure.Services
                     });
                 }
 
-                order.Status = OrderStatus.Returned;
+                // NEW: tính lại tổng số lượng đã trả của TOÀN ĐƠN (gồm cả phiếu vừa tạo)
+                // sau khi SaveChanges để query _db.Returns thấy được bản ghi vừa Add (EF Core
+                // tracking vẫn cho phép query lại nhờ AsTracking + đã add vào context, nhưng để
+                // chắc chắn và rõ ràng ta cộng thủ công bản ghi vừa tạo vào kết quả sum cũ).
+                await _db.SaveChangesAsync();
+
+                var totalOrderedQuantity = order.Items.Sum(i => i.Quantity);
+
+                var totalReturnedQuantity = await _db.Returns
+                    .Where(r => r.OrderId == order.Id)
+                    .SumAsync(r => r.Quantity);
+
+                order.Status = totalReturnedQuantity >= totalOrderedQuantity
+                    ? OrderStatus.Returned
+                    : OrderStatus.PartiallyReturned;
                 order.UpdatedAt = DateTime.UtcNow;
 
                 await _db.SaveChangesAsync();
@@ -405,5 +428,3 @@ namespace FashionERP.Infrastructure.Services
         }
     }
 }
-
-

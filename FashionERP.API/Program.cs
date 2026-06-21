@@ -155,6 +155,11 @@ using FashionERP.Infrastructure.Auth;
 using FashionERP.Infrastructure.Data;
 using FashionERP.Infrastructure.Data.Seeders;
 
+using FashionERP.Application.Interfaces;
+using FashionERP.Infrastructure.AIClient;
+using FashionERP.Infrastructure.Services;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ======================
@@ -319,7 +324,27 @@ builder.Services.AddCors(opt =>
             .AllowAnyMethod()
             .AllowCredentials();
     });
+
+
+
+    // 10.Đăng ký HttpClient có tên "AiService" để gọi sang Python FastAPI
+builder.Services.AddHttpClient("AiService", client =>
+{
+    var baseUrl = builder.Configuration["AiService:BaseUrl"]
+        ?? throw new InvalidOperationException("Thiếu config AiService:BaseUrl trong appsettings.json");
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
+
+    // 11. Đăng ký client gọi HTTP thuần
+    builder.Services.AddScoped<IAIServiceClient, AIServiceClient>();
+
+    // 12. Đăng ký tầng nghiệp vụ AI (build context từ DB + gọi client + ghi log)
+    builder.Services.AddScoped<IAIService, AIService>();
+});
+
+
+
 
 // ======================
 // BUILD APP
