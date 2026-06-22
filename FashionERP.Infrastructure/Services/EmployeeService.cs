@@ -126,16 +126,24 @@ namespace FashionERP.Infrastructure.Services
             await _db.SaveChangesAsync();
             return _mapper.Map<EmployeeResponseDto>(emp);
         }
-
         // ─── DELETE ───────────────────────────────────────────
         public async Task DeleteAsync(Guid id)
         {
-            var employee = await _db.Employees.FindAsync(id) ??
-                           throw new NotFoundException("Nhân viên", id);
+            var emp = await _db.Employees.FindAsync(id)
+                ?? throw new NotFoundException("Nhân viên", id);
 
-            employee.MarkDeleted();
-            employee.Status = EmployeeStatus.Resigned; // Update trạng thái nghỉ việc
-            employee.UpdatedAt = DateTime.UtcNow;
+            if (await _db.Orders.AnyAsync(o => o.StaffId == id))
+            {
+                // Đã có đơn hàng -> Soft Delete bằng cách chuyển trạng thái sang Nghỉ việc (Resigned)
+                emp.Status = EmployeeStatus.Resigned;
+                _db.Employees.Update(emp);
+            }
+            else
+            {
+                // Chưa có dữ liệu liên kết -> Hard Delete (Xóa thật)
+                _db.Employees.Remove(emp);
+            }
+
             await _db.SaveChangesAsync();
         }
 

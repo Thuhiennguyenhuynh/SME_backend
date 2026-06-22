@@ -79,9 +79,38 @@
                     Status = ProductStatus.Active,
                     ProductCode = "PROD-2025-0005"
                 },
-            };
 
-            await db.Products.AddRangeAsync(products);
+
+            };
+            // -- ĐOẠN MỚI: SINH THÊM 45 SẢN PHẨM AUTO --
+            var random = new Random();
+            string[] types = { "Áo polo", "Quần short", "Áo khoác", "Chân váy", "Áo len", "Quần tây" };
+            string[] styles = { "Basic", "Hàn Quốc", "Vintage", "Oversize", "Slimfit" };
+            var cats = new[] { SeedIds.Cat_AoNam, SeedIds.Cat_AoNu, SeedIds.Cat_QuanNam, SeedIds.Cat_QuanNu };
+            var genders = new[] { ProductGender.Male, ProductGender.Female, ProductGender.Unisex };
+
+            for (int i = 6; i <= 55; i++)
+            {
+                var type = types[random.Next(types.Length)];
+                var style = styles[random.Next(styles.Length)];
+                var catId = cats[random.Next(cats.Length)];
+
+                products.Add(new Product
+                {
+                    Id = Guid.NewGuid(), // Dùng Guid động cho dữ liệu sinh thêm
+                    Name = $"{type} {style} tự động {i}",
+                    Description = $"Sản phẩm {type} phong cách {style} chất lượng cao, đường may tỉ mỉ.",
+                    CategoryId = catId,
+                    BrandId = SeedIds.Brand_Local,
+                    Gender = genders[random.Next(genders.Length)],
+                    BasePrice = random.Next(15, 60) * 10000, // Giá từ 150k - 600k
+                    Tags = "auto-gen",
+                    Status = ProductStatus.Active,
+                    ProductCode = $"PROD-2025-{i:D4}"
+                });
+            }
+
+                await db.Products.AddRangeAsync(products);
             await db.SaveChangesAsync();
             System.Console.WriteLine("[Seeder] Products: OK");
         }

@@ -117,12 +117,14 @@ namespace FashionERP.Infrastructure.Services
         // ─── DELETE ───────────────────────────────────────────
         public async Task DeleteAsync(Guid id)
         {
-            var customer = await BaseQuery().FirstOrDefaultAsync(c => c.Id == id) ??
-                           throw new NotFoundException("Khách hàng", id);
+            var customer = await _db.Customers.FindAsync(id)
+                ?? throw new NotFoundException("Khách hàng", id);
 
-            // Xóa mềm sử dụng Extension method có sẵn trong project
-            customer.MarkDeleted();
-            customer.UpdatedAt = DateTime.UtcNow;
+            // Trả về lỗi quy trình nếu khách hàng đã có đơn hàng (Không cần dùng IsActive)
+            if (await _db.Orders.AnyAsync(o => o.CustomerId == id))
+                throw new BusinessException("Không thể xóa khách hàng đã có lịch sử đơn hàng.");
+
+            _db.Customers.Remove(customer);
             await _db.SaveChangesAsync();
         }
 
