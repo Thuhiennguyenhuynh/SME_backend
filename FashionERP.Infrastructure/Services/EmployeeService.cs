@@ -130,14 +130,12 @@ namespace FashionERP.Infrastructure.Services
         // ─── DELETE ───────────────────────────────────────────
         public async Task DeleteAsync(Guid id)
         {
-            var emp = await _db.Employees.FindAsync(id)
-                ?? throw new NotFoundException("Nhân viên", id);
+            var employee = await _db.Employees.FindAsync(id) ??
+                           throw new NotFoundException("Nhân viên", id);
 
-            // Không cho xóa nếu đã có đơn hàng liên quan
-            if (await _db.Orders.AnyAsync(o => o.StaffId == id))
-                throw new BusinessException("Không thể xóa nhân viên đã có đơn hàng. Hãy chuyển sang trạng thái Resigned thay thế");
-
-            _db.Employees.Remove(emp);
+            employee.MarkDeleted();
+            employee.Status = EmployeeStatus.Resigned; // Update trạng thái nghỉ việc
+            employee.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
         }
 

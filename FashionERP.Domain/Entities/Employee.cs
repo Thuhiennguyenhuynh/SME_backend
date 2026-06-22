@@ -62,6 +62,8 @@ namespace FashionERP.Domain.Entities
 
         [StringLength(200)]
         public string? AvatarPublicId { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
 
         // Navigation
         public virtual ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();

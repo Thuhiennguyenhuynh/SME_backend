@@ -55,6 +55,8 @@ namespace FashionERP.Domain.Entities
 
         [StringLength(300, ErrorMessage = "Ghi chú không được vượt quá 300 ký tự")]
         public string? Note { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
 
         // Navigation
         public virtual CustomerMeasurement? Measurement { get; set; }
