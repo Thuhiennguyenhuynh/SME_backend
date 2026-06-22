@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using FashionERP.Application.Common;
 using FashionERP.Application.DTOs.Product;
 using FashionERP.Application.Interfaces;
+using FashionERP.Domain.Common;
 using FashionERP.Domain.Entities;
 using FashionERP.Domain.Enums;
 using FashionERP.Infrastructure.Data;
@@ -24,35 +26,48 @@ namespace FashionERP.Infrastructure.Services
             _mapper = mapper;
         }
 
+        private static readonly Dictionary<string, Expression<Func<Product, object>>> SortMap = new()
+        {
+            ["name"] = x => x.Name,
+            ["price"] = x => x.BasePrice,
+            ["createdat"] = x => x.CreatedAt
+        };
+
         private IQueryable<Product> BaseQuery() =>
             _db.Products
                 .Include(p => p.Category)
                 .Include(p => p.Brand)
                 .Include(p => p.Variants).ThenInclude(v => v.Inventory);
 
-        // ─── GET ALL (filter + search) ────────────────────────
-        public async Task<List<ProductResponseDto>> GetAllAsync(
-            string? status, Guid? categoryId, string? keyword)
+        // ─── GET ALL (paging + filter + smart search + sort) ──
+        public async Task<PagedResult<ProductResponseDto>> GetAllAsync(ProductQueryParams p)
         {
             var query = BaseQuery();
 
-            if (!string.IsNullOrEmpty(status) && Enum.TryParse<ProductStatus>(status, out var st))
-                query = query.Where(p => p.Status == st);
+            ProductStatus statusFilter = default;
+            var hasStatusFilter = !string.IsNullOrEmpty(p.Status) && Enum.TryParse(p.Status, out statusFilter);
 
-            if (categoryId.HasValue)
-                query = query.Where(p => p.CategoryId == categoryId.Value);
+            query = query
+                .WhereIf(hasStatusFilter, x => x.Status == statusFilter)
+                .WhereIf(p.CategoryId.HasValue, x => x.CategoryId == p.CategoryId)
+                .WhereIf(p.BrandId.HasValue, x => x.BrandId == p.BrandId)
+                .WhereIf(!string.IsNullOrEmpty(p.Gender), x => x.Gender.ToString() == p.Gender)
+                .WhereIf(p.MinPrice.HasValue, x => x.BasePrice >= p.MinPrice)
+                .WhereIf(p.MaxPrice.HasValue, x => x.BasePrice <= p.MaxPrice)
+                .WhereIf(!string.IsNullOrEmpty(p.Size),
+                    x => x.Variants.Any(v => v.Size.ToString() == p.Size && v.IsActive))
+                .WhereIf(!string.IsNullOrEmpty(p.Color),
+                    x => x.Variants.Any(v => v.Color.ToLower().Contains(p.Color!.Trim().ToLower()) && v.IsActive))
+                .WhereIf(p.InStock == true,
+                    x => x.Variants.Any(v => v.Inventory != null && v.Inventory.Quantity > 0))
+                .WhereIf(p.InStock == false,
+                    x => x.Variants.All(v => v.Inventory == null || v.Inventory.Quantity == 0));
 
-            if (!string.IsNullOrEmpty(keyword))
-            {
-                var kw = keyword.Trim().ToLower();
-                query = query.Where(p =>
-                    p.Name.ToLower().Contains(kw) ||
-                    p.ProductCode.ToLower().Contains(kw) ||
-                    (p.Tags != null && p.Tags.ToLower().Contains(kw)));
-            }
+            query = query.SmartSearch(p.Keyword, x => x.Name, x => x.ProductCode, x => x.Tags);
+            query = query.ApplySort(p.SortBy, SortMap);
 
-            var list = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
-            return _mapper.Map<List<ProductResponseDto>>(list);
+            var paged = await query.ToPagedResultAsync(p.Page, p.PageSize);
+            return paged.MapTo(items => _mapper.Map<List<ProductResponseDto>>(items));
         }
 
         // ─── GET BY ID ────────────────────────────────────────
@@ -78,7 +93,6 @@ namespace FashionERP.Infrastructure.Services
             if (!Enum.TryParse<ProductStatus>(request.Status, out var status))
                 status = ProductStatus.Draft;
 
-            // Sinh ProductCode: PROD-{YYYY}-{số thứ tự 4 chữ số}
             var year = DateTime.UtcNow.Year;
             var countThisYear = await _db.Products
                 .CountAsync(p => p.ProductCode.StartsWith($"PROD-{year}-"));
@@ -135,19 +149,19 @@ namespace FashionERP.Infrastructure.Services
             return await GetByIdAsync(id);
         }
 
-        // ─── DELETE ───────────────────────────────────────────
+        // ─── DELETE (soft delete) ──────────────────────────────
         public async Task DeleteAsync(Guid id)
         {
             var product = await _db.Products.FindAsync(id)
                 ?? throw new NotFoundException("Sản phẩm", id);
 
-            // Không cho xóa nếu đã có trong đơn hàng
-            var hasOrders = await _db.OrderItems
-                .AnyAsync(oi => oi.Variant.ProductId == id);
+            var hasOrders = await _db.OrderItems.AnyAsync(oi => oi.Variant.ProductId == id);
             if (hasOrders)
-                throw new BusinessException("Không thể xóa sản phẩm đã có trong đơn hàng. Hãy chuyển trạng thái sang Archived");
+                throw new BusinessException("Sản phẩm đã có trong đơn hàng, không thể xóa cứng. Đã chuyển sang Archived.");
 
-            _db.Products.Remove(product);
+            product.MarkDeleted();
+            product.Status = ProductStatus.Archived;
+            product.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
         }
 
@@ -172,7 +186,6 @@ namespace FashionERP.Infrastructure.Services
             if (!Enum.TryParse<ProductSize>(request.Size, out var size))
                 throw new AppException("Kích cỡ không hợp lệ");
 
-            // Kiểm tra trùng (productId, size, color)
             var dup = await _db.ProductVariants.AnyAsync(v =>
                 v.ProductId == request.ProductId &&
                 v.Size == size &&
@@ -180,12 +193,10 @@ namespace FashionERP.Infrastructure.Services
             if (dup)
                 throw new DuplicateException($"Biến thể {request.Size} - {request.Color} đã tồn tại cho sản phẩm này");
 
-            // Sinh SKU: {ProductCode}-{SIZE}-{COLOR_UPPER_NO_SPACE}
             var product = await _db.Products.FindAsync(request.ProductId)!;
             var colorKey = request.Color.Trim().ToUpper().Replace(" ", "");
             var sku = $"{product!.ProductCode}-{request.Size}-{colorKey}";
 
-            // Nếu SKU trùng thì thêm hậu tố số
             var skuBase = sku;
             var suffix = 1;
             while (await _db.ProductVariants.AnyAsync(v => v.Sku == sku))
@@ -205,7 +216,6 @@ namespace FashionERP.Infrastructure.Services
 
             _db.ProductVariants.Add(variant);
 
-            // Tạo bản ghi Inventory cho variant mới (quantity = 0)
             var inventory = new Inventory
             {
                 VariantId = variant.Id,
@@ -232,7 +242,6 @@ namespace FashionERP.Infrastructure.Services
             if (!Enum.TryParse<ProductSize>(request.Size, out var size))
                 throw new AppException("Kích cỡ không hợp lệ");
 
-            // Kiểm tra trùng với biến thể KHÁC cùng product
             var dup = await _db.ProductVariants.AnyAsync(v =>
                 v.ProductId == variant.ProductId &&
                 v.Size == size &&
@@ -241,7 +250,6 @@ namespace FashionERP.Infrastructure.Services
             if (dup)
                 throw new DuplicateException($"Biến thể {request.Size} - {request.Color} đã tồn tại cho sản phẩm này");
 
-            // Kiểm tra barcode trùng (nếu có)
             if (!string.IsNullOrEmpty(request.Barcode) &&
                 await _db.ProductVariants.AnyAsync(v =>
                     v.Barcode == request.Barcode && v.Id != variantId))
@@ -272,5 +280,3 @@ namespace FashionERP.Infrastructure.Services
         }
     }
 }
-
-

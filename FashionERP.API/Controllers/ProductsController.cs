@@ -22,16 +22,20 @@ namespace FashionERP.API.Controllers
         }
 
         /// <summary>Lấy danh sách sản phẩm (có thể lọc theo status, category, keyword)</summary>
+        //[HttpGet]
+        //[AllowAnonymous]
+        //public async Task<IActionResult> GetAll(
+        //    [FromQuery] string? status,
+        //    [FromQuery] Guid? categoryId,
+        //    [FromQuery] string? keyword)
+        //{
+        //    var result = await _productService.GetAllAsync(status, categoryId, keyword);
+        //    return Ok(result);
+        //}
+
         [HttpGet]
-        [AllowAnonymous]
-        public async Task<IActionResult> GetAll(
-            [FromQuery] string? status,
-            [FromQuery] Guid? categoryId,
-            [FromQuery] string? keyword)
-        {
-            var result = await _productService.GetAllAsync(status, categoryId, keyword);
-            return Ok(result);
-        }
+        public async Task<IActionResult> GetAll([FromQuery] ProductQueryParams p)
+    => Ok(await _productService.GetAllAsync(p));
 
         /// <summary>Lấy chi tiết sản phẩm theo Id</summary>
         [HttpGet("{id:guid}")]

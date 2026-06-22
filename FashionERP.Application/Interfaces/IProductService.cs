@@ -3,11 +3,12 @@
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
+    using FashionERP.Application.Common;
     using FashionERP.Application.DTOs.Product;
 
     public interface IProductService
     {
-        Task<List<ProductResponseDto>> GetAllAsync(string? status, Guid? categoryId, string? keyword);
+        Task<PagedResult<ProductResponseDto>> GetAllAsync(ProductQueryParams p);
         Task<ProductResponseDto> GetByIdAsync(Guid id);
         Task<ProductResponseDto> CreateAsync(CreateProductRequestDto request);
         Task<ProductResponseDto> UpdateAsync(Guid id, UpdateProductRequestDto request);

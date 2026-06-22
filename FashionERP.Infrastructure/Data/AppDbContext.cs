@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Reflection;
+using Microsoft.EntityFrameworkCore;
 using FashionERP.Domain.Entities;
 using FashionERP.Domain.Enums;
 using FashionERP.Domain.Common;
@@ -68,7 +69,23 @@ namespace FashionERP.Infrastructure.Data
             ConfigureExpenses(modelBuilder);
             ConfigureSizeCharts(modelBuilder);
             ConfigureAILogs(modelBuilder);
+
+            // ===== SOFT DELETE: tự áp Global Query Filter cho MỌI entity =====
+            // implement ISoftDeletable, không cần khai .HasQueryFilter() riêng từng entity.
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+                {
+                    var method = typeof(AppDbContext)
+                        .GetMethod(nameof(SetSoftDeleteFilter), BindingFlags.NonPublic | BindingFlags.Static)!
+                        .MakeGenericMethod(entityType.ClrType);
+                    method.Invoke(null, new object[] { modelBuilder });
+                }
+            }
         }
+
+        private static void SetSoftDeleteFilter<T>(ModelBuilder builder) where T : class, ISoftDeletable
+            => builder.Entity<T>().HasQueryFilter(e => !e.IsDeleted);
 
         // ============================================================
         // 1. AUTH & HR
@@ -581,5 +598,3 @@ namespace FashionERP.Infrastructure.Data
         }
     }
 }
-
-
