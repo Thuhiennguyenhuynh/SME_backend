@@ -3,6 +3,7 @@ using FashionERP.Application.Interfaces;
 using FashionERP.Infrastructure.Auth;
 using FashionERP.Infrastructure.Services;
 
+
 namespace FashionERP.Infrastructure
 {
     public static class DependencyInjection
@@ -31,6 +32,7 @@ namespace FashionERP.Infrastructure
             // ── External Services ─────────────────────────────
             services.AddScoped<ICloudinaryService, CloudinaryService>();
             services.AddScoped<IReportService, ReportService>();
+
 
             return services;
         }
