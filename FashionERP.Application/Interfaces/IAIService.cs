@@ -16,5 +16,7 @@ namespace FashionERP.Application.Interfaces
         Task<SizeRecommendResponseDto> RecommendSizeAsync(SizeRecommendRequestDto request, Guid? userId);
 
         Task<InventoryForecastResponseDto> ForecastAsync(InventoryForecastRequestDto request, Guid? userId);
+        // Thêm vào interface IAIService
+        Task<TrendAnalysisResponseDto> GetTrendAnalysisAsync(TrendAnalysisRequestDto request, Guid userId);
     }
 }

@@ -45,5 +45,18 @@ namespace FashionERP.API.Controllers
             var result = await _aiService.ForecastAsync(request, CurrentUserId);
             return Ok(result, "Dự báo tồn kho thành công");
         }
+
+        /// <summary>Phân tích xu hướng bán hàng theo khoảng thời gian</summary>
+        [HttpGet("trend-analysis")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> GetTrendAnalysis(
+            [FromQuery] DateTime from,
+            [FromQuery] DateTime to,
+            [FromQuery] string? category = null)
+        {
+            var request = new TrendAnalysisRequestDto(from, to, category);
+            var result = await _aiService.GetTrendAnalysisAsync(request, CurrentUserId);
+            return Ok(result, "Phân tích xu hướng thành công");
+        }
     }
 }

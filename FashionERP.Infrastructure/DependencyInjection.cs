@@ -30,6 +30,7 @@ namespace FashionERP.Infrastructure
 
             // ── External Services ─────────────────────────────
             services.AddScoped<ICloudinaryService, CloudinaryService>();
+            services.AddScoped<IReportService, ReportService>();
 
             return services;
         }

@@ -426,5 +426,35 @@ namespace FashionERP.Infrastructure.Services
                 throw;
             }
         }
+
+
+        public async Task<PagedResult<OrderResponseDto>> GetAllAsync(
+    string? status, DateTime? from, DateTime? to,
+    Guid? staffId, int page, int pageSize)
+        {
+            var query = _db.Orders
+                .Include(o => o.Customer)
+                .Include(o => o.Items)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(o => o.Status == status);
+            if (from.HasValue)
+                query = query.Where(o => o.CreatedAt >= from.Value);
+            if (to.HasValue)
+                query = query.Where(o => o.CreatedAt <= to.Value);
+            if (staffId.HasValue)
+                query = query.Where(o => o.StaffId == staffId.Value);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(o => _mapper.Map<OrderResponseDto>(o))
+                .ToListAsync();
+
+            return new PagedResult<OrderResponseDto>(items, total, page, pageSize);
+        }
     }
 }

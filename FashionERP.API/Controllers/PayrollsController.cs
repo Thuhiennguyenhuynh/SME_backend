@@ -56,5 +56,28 @@ namespace FashionERP.API.Controllers
             await _payrollService.MarkAsPaidAsync(id);
             return Ok<object>(null!, "Đánh dấu đã trả lương thành công");
         }
+        /// <summary>Nhân viên xem lương của mình theo tháng/năm (self-access)</summary>
+        [HttpGet("{employeeId:guid}/{year:int}/{month:int}")]
+        [Authorize] // Mọi role đều xem được, nhưng chỉ xem của mình
+        public async Task<IActionResult> GetByEmployee(Guid employeeId, int year, int month)
+        {
+            // Staff chỉ xem lương của chính mình; Admin/Manager xem được tất cả
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+            if (role == "Sales" || role == "Warehouse" || role == "Accountant")
+            {
+                if (CurrentEmployeeId != employeeId)
+                    return Forbid();
+            }
+
+            if (month < 1 || month > 12) return BadRequest("Tháng không hợp lệ");
+            if (year < 2000 || year > 2100) return BadRequest("Năm không hợp lệ");
+
+            var result = await _payrollService.GetByEmployeeMonthAsync(employeeId, year, month);
+            if (result == null)
+                return NotFound("Chưa có bảng lương cho tháng này");
+
+            return Ok(result);
+        }
+
     }
 }

@@ -9,6 +9,7 @@
     {
         Task<PayrollResponseDto> GenerateAsync(GeneratePayrollRequestDto request);
         Task<List<PayrollResponseDto>> GetByMonthYearAsync(int month, int year);
+        Task<PayrollResponseDto?> GetByEmployeeMonthAsync(Guid employeeId, int year, int month);
         Task ConfirmAsync(Guid id);
         Task MarkAsPaidAsync(Guid id);
     }

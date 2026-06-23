@@ -138,5 +138,33 @@ namespace FashionERP.Infrastructure.Services
                 throw;
             }
         }
+        public async Task<PagedResult<InventoryResponseDto>> GetAllAsync(
+    bool? lowStockOnly, Guid? productId, string? keyword,
+    int page, int pageSize)
+        {
+            var query = _db.Inventories
+                .Include(i => i.Variant)
+                    .ThenInclude(v => v.Product)
+                .AsQueryable();
+
+            if (lowStockOnly == true)
+                query = query.Where(i => i.Quantity <= i.MinStock);
+            if (productId.HasValue)
+                query = query.Where(i => i.Variant.ProductId == productId.Value);
+            if (!string.IsNullOrWhiteSpace(keyword))
+                query = query.Where(i =>
+                    i.Variant.Sku.Contains(keyword) ||
+                    i.Variant.Product.Name.Contains(keyword));
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderBy(i => i.Variant.Product.Name)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(i => _mapper.Map<InventoryResponseDto>(i))
+                .ToListAsync();
+
+            return new PagedResult<InventoryResponseDto>(items, total, page, pageSize);
+        }
     }
 }

@@ -47,6 +47,21 @@ namespace FashionERP.API.Controllers
             return Created(result, "Thêm nhân viên thành công");
         }
 
+        public record UpdateEmployeeStatusDto(string Status);
+
+        /// <summary>Chuyển trạng thái nhân viên (Active/Probation/Resigned)</summary>
+        [HttpPatch("{id:guid}/status")]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateEmployeeStatusDto request)
+        {
+            var allowed = new[] { "Active", "Probation", "Resigned" };
+            if (!Array.Exists(allowed, s => s == request.Status))
+                return BadRequest($"Status không hợp lệ. Chỉ chấp nhận: {string.Join(", ", allowed)}");
+
+            await _employeeService.UpdateStatusAsync(id, request.Status);
+            return Ok<object>(null!, $"Cập nhật trạng thái nhân viên thành {request.Status} thành công");
+        }
+
         /// <summary>Cập nhật thông tin nhân viên</summary>
         [HttpPut("{id:guid}")]
         [Authorize(Roles = "Admin,Manager")]

@@ -339,6 +339,60 @@ namespace FashionERP.Infrastructure.Services
             {
                 // Không throw lại - ghi log AI thất bại không nên ảnh hưởng tới response chính
             }
+
+
+
+
         }
+        public async Task<TrendAnalysisResponseDto> GetTrendAnalysisAsync(
+    TrendAnalysisRequestDto request, Guid userId)
+        {
+            // Lấy dữ liệu bán hàng trong khoảng thời gian
+            var period = (int)(request.To - request.From).TotalDays;
+            var prevFrom = request.From.AddDays(-period);
+
+            var currentData = await GetSalesDataAsync(request.From, request.To, request.Category);
+            var prevData = await GetSalesDataAsync(prevFrom, request.From, request.Category);
+
+            var trends = currentData.Select(c =>
+            {
+                var prev = prevData.FirstOrDefault(p => p.Sku == c.Sku);
+                var growthRate = prev == null || prev.TotalSold == 0
+                    ? 100.0
+                    : (c.TotalSold - prev.TotalSold) * 100.0 / prev.TotalSold;
+                return new TrendAnalysisTrendItem(c.ProductName, c.Sku, c.TotalSold, c.Revenue, growthRate);
+            }).ToList();
+
+            var result = new TrendAnalysisResponseDto(
+                TopTrends: trends.Where(t => t.GrowthRate >= 0).OrderByDescending(t => t.GrowthRate).Take(10).ToList(),
+                DecliningItems: trends.Where(t => t.GrowthRate < 0).OrderBy(t => t.GrowthRate).Take(10).ToList(),
+                Summary: $"Phân tích {currentData.Count} sản phẩm từ {request.From:dd/MM/yyyy} đến {request.To:dd/MM/yyyy}");
+
+            await LogAIAsync("TrendAnalysis", userId, result);
+            return result;
+        }
+
+        // Helper method (private)
+        private async Task<List<(string ProductName, string Sku, int TotalSold, decimal Revenue)>>
+            GetSalesDataAsync(DateTime from, DateTime to, string? category)
+        {
+            var query = _db.OrderItems
+                .Include(oi => oi.Order)
+                .Include(oi => oi.Variant).ThenInclude(v => v.Product).ThenInclude(p => p.Category)
+                .Where(oi => oi.Order.Status == "Completed"
+                          && oi.Order.CompletedAt >= from
+                          && oi.Order.CompletedAt <= to);
+
+            if (!string.IsNullOrEmpty(category))
+                query = query.Where(oi => oi.Variant.Product.Category.Name == category);
+
+            return await query
+                .GroupBy(oi => new { oi.ProductName, oi.Sku })
+                .Select(g => ValueTuple.Create(g.Key.ProductName, g.Key.Sku ?? "", g.Sum(x => x.Quantity), g.Sum(x => x.LineTotal)))
+                .ToListAsync();
+        }
+
     }
+
+
 }

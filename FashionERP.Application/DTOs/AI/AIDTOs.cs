@@ -161,4 +161,22 @@ namespace FashionERP.Application.DTOs.AI
         public DateTime Date { get; set; }
         public int QuantitySold { get; set; }
     }
+
+    // Thêm vào file AIDTOs.cs
+    public record TrendAnalysisRequestDto(
+        DateTime From,
+        DateTime To,
+        string? Category = null);
+
+    public record TrendAnalysisTrendItem(
+        string ProductName,
+        string Sku,
+        int TotalSold,
+        decimal Revenue,
+        double GrowthRate);
+
+    public record TrendAnalysisResponseDto(
+        List<TrendAnalysisTrendItem> TopTrends,
+        List<TrendAnalysisTrendItem> DecliningItems,
+        string Summary);
 }

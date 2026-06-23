@@ -147,6 +147,16 @@ namespace FashionERP.Infrastructure.Services
             await _db.SaveChangesAsync();
         }
 
+
+        public async Task UpdateStatusAsync(Guid id, string status)
+        {
+            var emp = await _db.Employees.FindAsync(id)
+                ?? throw new NotFoundException("Nhân viên", id);
+            emp.Status = status;
+            emp.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
         // ─── UPDATE AVATAR ────────────────────────────────────
         public async Task UpdateAvatarAsync(Guid id, string imageUrl, string publicId)
         {

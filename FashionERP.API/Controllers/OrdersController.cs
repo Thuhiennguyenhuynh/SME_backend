@@ -79,6 +79,19 @@ namespace FashionERP.API.Controllers
             var result = await _orderService.CreateReturnAsync(request, CurrentUserId);
             return Created(result, "Tạo phiếu đổi trả thành công");
         }
+        /// <summary>Danh sách đơn hàng — filter + phân trang</summary>
+        [HttpGet]
+        public async Task<IActionResult> GetAll(
+            [FromQuery] string? status,
+            [FromQuery] DateTime? from,
+            [FromQuery] DateTime? to,
+            [FromQuery] Guid? staffId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _orderService.GetAllAsync(status, from, to, staffId, page, pageSize);
+            return Ok(result);
+        }
     }
 }
 
