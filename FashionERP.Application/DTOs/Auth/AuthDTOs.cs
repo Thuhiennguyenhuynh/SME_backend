@@ -50,4 +50,15 @@ namespace FashionERP.Application.DTOs.Auth
         public string RefreshToken { get; set; } = string.Empty;
         public UserInfoDto User { get; set; } = new();
     }
+ 
+
+    public class UserListItemDto
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public Guid? EmployeeId { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime? LastLoginAt { get; set; }
+    }
 }

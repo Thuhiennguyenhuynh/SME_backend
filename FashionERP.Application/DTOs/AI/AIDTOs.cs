@@ -179,4 +179,32 @@ namespace FashionERP.Application.DTOs.AI
         List<TrendAnalysisTrendItem> TopTrends,
         List<TrendAnalysisTrendItem> DecliningItems,
         string Summary);
+
+
+    // ─── Trend Analysis Proxy (cho IAIServiceClient nếu cần forward Python) ──────
+    public class AITrendAnalysisProxyRequest
+    {
+        /// <summary>Từ ngày (UTC)</summary>
+        public DateTime From { get; set; }
+
+        /// <summary>Đến ngày (UTC)</summary>
+        public DateTime To { get; set; }
+
+        /// <summary>Lọc theo danh mục sản phẩm (nullable)</summary>
+        public string? Category { get; set; }
+
+        /// <summary>Dữ liệu bán hàng kỳ hiện tại để Python phân tích</summary>
+        public List<AITrendSalesPointDto> CurrentPeriodData { get; set; } = new();
+
+        /// <summary>Dữ liệu bán hàng kỳ trước để Python so sánh trend</summary>
+        public List<AITrendSalesPointDto> PreviousPeriodData { get; set; } = new();
+    }
+
+    public class AITrendSalesPointDto
+    {
+        public string ProductName { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public int TotalSold { get; set; }
+        public decimal Revenue { get; set; }
+    }
 }

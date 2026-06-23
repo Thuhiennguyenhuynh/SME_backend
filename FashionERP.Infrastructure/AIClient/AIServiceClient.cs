@@ -72,5 +72,14 @@ namespace FashionERP.Infrastructure.AIClient
                 throw new AppException("Không thể kết nối tới dịch vụ AI", 503);
             }
         }
+        // ─── Thêm method này vào class AIServiceClient ─────────────────────────────
+
+        public async Task<TrendAnalysisResponseDto> GetTrendAnalysisAsync(
+            AITrendAnalysisProxyRequest request,
+            CancellationToken ct = default)
+        {
+            return await PostAsync<AITrendAnalysisProxyRequest, TrendAnalysisResponseDto>(
+                "/trend-analysis", request, ct);
+        }
     }
 }

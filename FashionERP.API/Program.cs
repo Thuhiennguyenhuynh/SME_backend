@@ -171,6 +171,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         sql => sql.EnableRetryOnFailure(3)
     )
 );
+// User
+builder.Services.AddScoped<IUserService, UserService>();
 
 // ======================
 // 2. JWT CONFIG
